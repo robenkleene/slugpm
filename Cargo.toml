@@ -3,6 +3,9 @@ name = "slugpm"
 version = "0.1.0"
 edition = "2021"
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
-
 [dependencies]
+anyhow = "1"
+clap = { version = "4", features = ["derive"] }
+atty = "0.2"
+slug = "0.1"
+regex = "1"
