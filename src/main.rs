@@ -1,4 +1,5 @@
 use std::{fs, io::{self, Read, Write}, path::{Path, PathBuf}};
+use std::fmt;
 use anyhow::{Context, Result};
 use clap::{Parser, Subcommand};
 use atty::Stream;
@@ -107,41 +108,95 @@ fn create_project_dir(title: &str) -> Result<()> {
     Ok(())
 }
 
-fn archive_dir_for_file(file: &Path) -> PathBuf {
-    file.parent().unwrap().join("archive")
+
+/// Pure function: Given a file path, returns the archive directory path.
+pub fn archive_dir_for_file_pure(parent: &Path) -> PathBuf {
+    parent.join("archive")
 }
-fn archive_dir_for_dir(dir: &Path) -> PathBuf {
-    // “…../<parent>/../archive/<dirname> relative to <dirname>”
-    let parent = dir.parent().unwrap();
+
+/// Pure function: Given a directory path, returns the archive directory path.
+pub fn archive_dir_for_dir_pure(parent: &Path) -> PathBuf {
     parent.parent().unwrap_or(parent).join("archive")
 }
 
+// Trait for file operations, so we can mock for tests
+pub trait FileOps {
+    fn create_dir_all(&self, path: &Path) -> Result<()>;
+    fn rename(&self, from: &Path, to: &Path) -> Result<()>;
+    fn open_append(&self, path: &Path) -> Result<Box<dyn Write>>;
+}
+
+/// Real file system implementation
+pub struct RealFileOps;
+impl FileOps for RealFileOps {
+    fn create_dir_all(&self, path: &Path) -> Result<()> {
+        fs::create_dir_all(path)?;
+        Ok(())
+    }
+    fn rename(&self, from: &Path, to: &Path) -> Result<()> {
+        fs::rename(from, to)?;
+        Ok(())
+    }
+    fn open_append(&self, path: &Path) -> Result<Box<dyn Write>> {
+        Ok(Box::new(fs::OpenOptions::new().create(true).append(true).open(path)?))
+    }
+}
+
+/// Mock file system for tests (in-memory, does nothing)
+#[cfg(test)]
+pub struct MockFileOps;
+#[cfg(test)]
+impl FileOps for MockFileOps {
+    fn create_dir_all(&self, _path: &Path) -> Result<()> { Ok(()) }
+    fn rename(&self, _from: &Path, _to: &Path) -> Result<()> { Ok(()) }
+    fn open_append(&self, _path: &Path) -> Result<Box<dyn Write>> {
+        struct Sink;
+        impl Write for Sink {
+            fn write(&mut self, buf: &[u8]) -> io::Result<usize> { Ok(buf.len()) }
+            fn flush(&mut self) -> io::Result<()> { Ok(()) }
+        }
+        Ok(Box::new(Sink))
+    }
+}
+
+
 fn archive_move_file(file: &Path) -> Result<()> {
-    let arch_dir = archive_dir_for_file(file);
-    fs::create_dir_all(&arch_dir)?;
+    archive_move_file_with(file, &RealFileOps)
+}
+
+fn archive_move_file_with(file: &Path, ops: &dyn FileOps) -> Result<()> {
+    let arch_dir = archive_dir_for_file_pure(file.parent().unwrap());
+    ops.create_dir_all(&arch_dir)?;
     let dest = arch_dir.join(file.file_name().unwrap());
-    fs::rename(file, &dest)
+    ops.rename(file, &dest)
         .with_context(|| format!("moving {} -> {}", file.display(), dest.display()))?;
     println!("{}", dest.display());
     Ok(())
 }
 
 fn archive_move_dir(dir: &Path) -> Result<()> {
-    let arch_dir = archive_dir_for_dir(dir);
-    fs::create_dir_all(&arch_dir)?;
+    archive_move_dir_with(dir, &RealFileOps)
+}
+
+fn archive_move_dir_with(dir: &Path, ops: &dyn FileOps) -> Result<()> {
+    let arch_dir = archive_dir_for_dir_pure(dir.parent().unwrap());
+    ops.create_dir_all(&arch_dir)?;
     let dest = arch_dir.join(dir.file_name().unwrap());
-    fs::rename(dir, &dest)
+    ops.rename(dir, &dest)
         .with_context(|| format!("moving {} -> {}", dir.display(), dest.display()))?;
     println!("{}", dest.display());
     Ok(())
 }
 
 fn archive_append_stdin(file: &Path) -> Result<()> {
-    let arch_dir = archive_dir_for_file(file);
-    fs::create_dir_all(&arch_dir)?;
+    archive_append_stdin_with(file, &RealFileOps)
+}
+
+fn archive_append_stdin_with(file: &Path, ops: &dyn FileOps) -> Result<()> {
+    let arch_dir = archive_dir_for_file_pure(file.parent().unwrap());
+    ops.create_dir_all(&arch_dir)?;
     let dest = arch_dir.join(file.file_name().unwrap());
-    let mut f = fs::OpenOptions::new()
-        .create(true).append(true).open(&dest)
+    let mut f = ops.open_append(&dest)
         .with_context(|| format!("opening {}", dest.display()))?;
     let mut buf = Vec::new();
     io::stdin().read_to_end(&mut buf)?;
