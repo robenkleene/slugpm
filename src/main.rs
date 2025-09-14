@@ -1,5 +1,4 @@
 use std::{fs, io::{self, Read, Write}, path::{Path, PathBuf}};
-use std::fmt;
 use anyhow::{Context, Result};
 use clap::{Parser, Subcommand};
 use atty::Stream;
