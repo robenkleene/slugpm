@@ -1,6 +1,6 @@
 //! Core logic for slugpm, extracted for testability.
 
-use std::{io::{self, Write}, path::{Path, PathBuf}};
+use std::{io::{self, Read, Write}, path::{Path, PathBuf}};
 use anyhow::{Result, Context};
 use slug::slugify;
 
