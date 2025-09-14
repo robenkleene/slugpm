@@ -1,10 +1,10 @@
 # Copilot Instructions for `slugpm`
 
-This project is a Rust CLI tool for managing project slugs and archiving files or directories. The codebase is intentionally minimal and focused on a few core workflows. Follow these guidelines to be productive as an AI coding agent in this repository.
+This project is a Rust CLI tool for managing project slugs and archiving files or directories. The codebase is intentionally minimal, with a focus on testability and clear workflows.
 
 ## Architecture & Key Concepts
-- **Single-binary CLI**: All logic is in `src/main.rs`. There are no modules or sub-crates.
-- **Commands**: Uses `clap` for argument parsing. Main commands:
+- **Single-binary CLI**: Entrypoint is `src/main.rs`. Core logic is in `src/lib.rs` for modularity and testability.
+- **Commands** (via `clap`):
   - `archive`: Move a file or directory to an `archive` folder (see below for rules).
   - `name`: Print the project name, stripping a leading date prefix.
   - Default (no subcommand): Create a new project directory under `project/<slug>` from a title (from args or piped stdin).
@@ -13,15 +13,16 @@ This project is a Rust CLI tool for managing project slugs and archiving files o
   - Files: Moved to `<parent>/archive/<filename>`.
   - Directories: Moved to `<parent>/../archive/<dirname>`.
   - If `-` is passed to `archive`, append stdin to the archive file instead of moving.
+- **Testability**: All file system logic is abstracted via a `FileOps` trait. A `MockFileOps` is provided for in-memory, side-effect-free testing.
 
 ## Developer Workflows
-- **Build**: Use `cargo build` (no special scripts).
-- **Run**: Use `cargo run -- [args]`.
-- **Test**: No tests are present; add new ones in `src/main.rs` if needed.
-- **Dependencies**: Managed in `Cargo.toml`. Uses only a few crates: `anyhow`, `clap`, `atty`, `slug`, `regex`.
+- **Build**: `cargo build`
+- **Run**: `cargo run -- [args]`
+- **Test**: `cargo test` (tests live in `tests/integration.rs` and use the mock file system)
+- **Dependencies**: Managed in `Cargo.toml`. Main crates: `anyhow`, `clap`, `atty`, `slug`, `regex`.
 
 ## Project Conventions
-- **No modules**: All logic is in a single file for simplicity.
+- **Modular logic**: CLI/command logic in `src/main.rs`, core logic in `src/lib.rs`.
 - **Error handling**: Uses `anyhow::Result` for all main functions.
 - **STDIN/STDOUT**: Many commands read from or write to standard streams. Detect piped input with `atty`.
 - **Date prefix**: Project names may start with `YYYY-MM-DD-`; the `name` command strips this.
@@ -35,8 +36,10 @@ This project is a Rust CLI tool for managing project slugs and archiving files o
 - Print name: `cargo run -- name 2025-09-13-MyProject`
 
 ## Key Files
-- `src/main.rs`: All logic and entrypoint.
+- `src/main.rs`: CLI and command logic.
+- `src/lib.rs`: Core logic, traits, and testability.
+- `tests/integration.rs`: Test suite using `MockFileOps`.
 - `Cargo.toml`: Dependencies and metadata.
 
 ---
-If you add new commands or change archiving logic, update this file with new patterns and examples.
+If you add new commands, change archiving logic, or update the test strategy, update this file with new patterns and examples.
