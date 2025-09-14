@@ -33,9 +33,7 @@ impl FileOps for RealFileOps {
     }
 }
 
-#[cfg(test)]
 pub struct MockFileOps;
-#[cfg(test)]
 impl FileOps for MockFileOps {
     fn create_dir_all(&self, _path: &Path) -> Result<()> { Ok(()) }
     fn rename(&self, _from: &Path, _to: &Path) -> Result<()> { Ok(()) }
